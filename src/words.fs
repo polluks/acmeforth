@@ -1,5 +1,12 @@
 variable base 10 base !
 
+code 0
+	lda	#0
+	tay
+	jmp	%pushya%
+;code
+1 constant 1
+
 : chars ;
 : align ;
 : aligned ;
@@ -8,12 +15,12 @@ variable base 10 base !
 : begin here ; immediate
 
 variable end
-create #buffer 80 allot
-: <# #buffer end ! ;
-: #> 2drop #buffer end @ over - ;
+create hold-buffer 34 allot
+: <# hold-buffer end ! ;
+: #> 2drop hold-buffer end @ over - ;
 : hold
-#buffer dup 1+ end @ #buffer - move
-1 end +!  #buffer c! ;
+hold-buffer dup 1+ end @ hold-buffer - move
+1 end +!  hold-buffer c! ;
 : sign 0< if '-' hold then ;
 : ud/mod
 >r 0 r@ um/mod r> swap >r um/mod r> ;
@@ -21,6 +28,7 @@ create #buffer 80 allot
 dup $a < if 7 - then $37 + hold ;
 : #s # begin 2dup or while # repeat ;
 
+: i postpone r@ ; immediate
 : nip swap drop ;
 : \ refill 0= if source nip >in ! then ; immediate
 : 2r@ r> r> r> 2dup >r >r rot rot swap >r ;
@@ -71,9 +79,24 @@ create pad 84 allot
 : ] -1 state ! ;
 : count dup 1+ swap c@ ;
 : /string dup >r - swap r> + swap ;
-: abort depth 0 do drop loop quit ;
+: abort depth 0 ?do drop loop quit ;
+: abort" postpone if postpone ." postpone cr postpone abort postpone then ; immediate
 : within over - >r - r> u< ; \ forth-standard.org
 : roll ?dup if swap >r 1- recurse r> swap then ;
+
+\ from test suite
+: S=  \ ( ADDR1 C1 ADDR2 C2 -- T/F ) COMPARE TWO STRINGS.
+   >R SWAP R@ = IF         \ MAKE SURE STRINGS HAVE SAME LENGTH
+      R> ?DUP IF         \ IF NON-EMPTY STRINGS
+    0 DO
+       OVER C@ OVER C@ - IF 2DROP FALSE UNLOOP EXIT THEN
+       SWAP CHAR+ SWAP CHAR+
+         LOOP
+      THEN
+      2DROP TRUE         \ IF WE GET HERE, STRINGS MATCH
+   ELSE
+      R> DROP 2DROP FALSE      \ LENGTHS MISMATCH
+   THEN ;
 
 ( from FIG UK )
 : /mod >r s>d r> fm/mod ;
@@ -96,7 +119,7 @@ create pad 84 allot
 : IS STATE @ IF POSTPONE ['] POSTPONE DEFER! ELSE ' DEFER! THEN ; IMMEDIATE
 : HOLDS BEGIN DUP WHILE 1- 2DUP + C@ HOLD REPEAT 2DROP ;
 
-:code	d+	; ( d1 d2 -- d3 )
+code	d+	; ( d1 d2 -- d3 )
 	clc
 	lda	LSB+1,x
 	adc	LSB+3,x
@@ -131,7 +154,7 @@ over c@ digit? while
 
 \ ----- C64 primitives below
 
-:code	c@
+code	c@
 	lda	LSB,x
 	sta	+ + 1
 	lda	MSB,x
@@ -143,7 +166,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code c!
+code c!
 	lda	LSB,x
 	sta	+ + 1
 	lda	MSB,x
@@ -155,14 +178,14 @@ over c@ digit? while
 	rts
 ;code
 
-:code 1+
+code 1+
 	inc LSB, x
 	bne +
 	inc MSB, x
 +	rts
 ;code
 
-:code litc
+code litc
 	dex
 
 	; load IP
@@ -187,7 +210,7 @@ over c@ digit? while
 +	jmp (W)
 ;code
 
-:code lit
+code lit
 	dex
 
 	; load IP
@@ -214,7 +237,7 @@ over c@ digit? while
 +	jmp $1234
 ;code
 
-:code (loop)
+code (loop)
 	stx	W	; x = stack pointer
 	tsx
 
@@ -254,7 +277,7 @@ over c@ digit? while
 	jmp	(W2)
 ;code
 
-:code 0branch
+code 0branch
 	inx
 	lda	LSB-1, x
 	ora	MSB-1, x
@@ -274,7 +297,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code !
+code !
 	lda LSB, x
 	sta W
 	lda MSB, x
@@ -292,12 +315,12 @@ over c@ digit? while
 	rts
 ;code
 
-:code negate
+code negate
 	jsr %invert%
 	jmp %1+%
 ;code
 
-:code 0<
+code 0<
 	lda	MSB,x
 	and	#$80
 	beq	+
@@ -307,7 +330,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code dup
+code dup
 	dex
 	lda MSB + 1, x
 	sta MSB, x
@@ -316,7 +339,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code type
+code type
 -	lda LSB,x
 	ora MSB,x
 	bne +
@@ -331,7 +354,7 @@ over c@ digit? while
 	jmp -
 ;code
 
-:code depth
+code depth
 	txa
 	eor #$ff
 	tay
@@ -343,7 +366,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code @
+code @
 	lda LSB,x
 	sta W
 	lda MSB,x
@@ -358,7 +381,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code =
+code =
 	ldy #0
 	lda LSB, x
 	cmp LSB + 1, x
@@ -373,7 +396,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code (do)
+code (do)
 	pla
 	sta	W
 	pla
@@ -399,11 +422,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code	i
-	jmp %r@%
-;code
-
-:code	j
+code	j
 	txa
 	tsx
 	ldy	$107,x
@@ -417,7 +436,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code +
+code +
 	lda LSB, x
 	clc
 	adc LSB + 1, x
@@ -431,7 +450,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code 0=
+code 0=
 	ldy #0
 	lda MSB, x
 	bne +
@@ -443,7 +462,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code sliteral
+code sliteral
 	jsr	%r>%
 	jsr	%1+%
 	jsr	%dup%
@@ -457,7 +476,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code 1-
+code 1-
 	lda LSB, x
 	bne +
 	dec MSB, x
@@ -465,12 +484,12 @@ over c@ digit? while
 	rts
 ;code
 
-:code 2dup
+code 2dup
 	jsr %over%
 	jmp %over%
 ;code
 
-:code over
+code over
 	dex
 	lda MSB + 2, x
 	sta MSB, x
@@ -479,7 +498,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code swap
+code swap
 	ldy MSB, x
 	lda MSB + 1, x
 	sta MSB, x
@@ -492,19 +511,19 @@ over c@ digit? while
 	rts
 ;code
 
-:code cr
+code cr
 	jsr	%litc%
 	!byte	$d
 	jmp	%emit%
 ;code
 
-:code emit
+code emit
 	lda	LSB, x
 	inx
 	jmp	PUTCHR
 ;code
 
-:code /string
+code /string
 	jsr %dup%
 	jsr %>r%
 	jsr %-%
@@ -514,7 +533,7 @@ over c@ digit? while
 	jmp %swap%
 ;code
 
-:code -
+code -
 	lda LSB + 1, x
 	sec
 	sbc LSB, x
@@ -526,20 +545,14 @@ over c@ digit? while
 	rts
 ;code
 
-:code 1
-	lda	#1
-	ldy	#0
-	jmp	%pushya%
-;code
-
-:code pushya
+code pushya
 	dex
 	sta	LSB, x
 	sty	MSB, x
 	rts
 ;code
 
-:code invert
+code invert
 	lda MSB, x
 	eor #$ff
 	sta MSB, x
@@ -549,7 +562,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code branch
+code branch
 	pla
 	sta W
 	pla
@@ -564,12 +577,12 @@ over c@ digit? while
 +	jmp $1234
 ;code
 
-:code	dabs
+code	dabs
 	jsr	%dup%
 	jmp	%?dnegate%
 ;code
 
-:code	?dnegate
+code	?dnegate
 	jsr	%0<%
 	inx
 	lda	MSB-1,x
@@ -578,7 +591,7 @@ over c@ digit? while
 +	rts
 ;code
 
-:code	dnegate
+code	dnegate
 	jsr	%invert%
 	jsr	%>r%
 	jsr	%invert%
@@ -587,7 +600,7 @@ over c@ digit? while
 	jmp	%m+%
 ;code
 
-:code	m+
+code	m+
 	ldy #0
 	lda MSB,x
 	bpl +
@@ -609,7 +622,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code	+!
+code	+!
 	lda	LSB,x
 	sta	W
 	lda	MSB,x
@@ -630,13 +643,13 @@ over c@ digit? while
 	rts
 ;code
 
-:code	2*
+code	2*
 	asl	LSB, x
 	rol	MSB, x
 	rts
 ;code
 
-:code	2/
+code	2/
 	lda	MSB,x
 	cmp	#$80
 	ror	MSB,x
@@ -644,7 +657,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code	and
+code	and
 	lda	MSB, x
 	and	MSB + 1, x
 	sta	MSB + 1, x
@@ -657,7 +670,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code	r>	; must be called using jsr
+code	r>	; must be called using jsr
 	pla
 	sta W
 	pla
@@ -674,7 +687,7 @@ over c@ digit? while
 	jmp (W)
 ;code
 
-:code	r@	; must be called using jsr
+code	r@	; must be called using jsr
 	txa
 	tsx
 	ldy $103,x
@@ -688,7 +701,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code	>r	; must be called using jsr
+code	>r	; must be called using jsr
 	pla
 	sta W
 	pla
@@ -705,7 +718,7 @@ over c@ digit? while
 	jmp (W)
 ;code
 
-:code	or
+code	or
 	lda	MSB,x
 	ora	MSB+1,x
 	sta	MSB+1,x
@@ -716,7 +729,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code	xor
+code	xor
 	lda	MSB,x
 	eor	MSB+1,x
 	sta	MSB+1,x
@@ -727,7 +740,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code	lshift
+code	lshift
 -	dec	LSB,x
 	bmi	+
 	asl	LSB+1,x
@@ -737,7 +750,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code	rshift
+code	rshift
 -	dec	LSB,x
 	bmi	+
 	lsr	MSB+1,x
@@ -747,7 +760,7 @@ over c@ digit? while
 	rts
 ;code
 
-:code	<
+code	<
     ldy #0
     sec
     lda LSB+1,x
@@ -764,12 +777,12 @@ over c@ digit? while
     rts
 ;code
 
-:code	>
+code	>
 	jsr	%swap%
 	jmp	%<%
 ;code
 
-:code	u<
+code	u<
     ldy #0
     lda MSB, x
     cmp MSB + 1, x
@@ -788,7 +801,7 @@ over c@ digit? while
     rts
 ;code
 
-:code	pick
+code	pick
     txa
     sta + + 1
     clc
@@ -803,7 +816,7 @@ over c@ digit? while
     rts
 ;code
 
-:code	rot
+code	rot
 	ldy	MSB+2,x
 	lda	MSB+1,x
 	sta	MSB+2,x
@@ -819,14 +832,14 @@ over c@ digit? while
 	rts
 ;code
 
-:code	abs
+code	abs
 	lda	MSB,x
 	bpl	+
 	jmp	%negate%
 +	rts
 ;code
 
-:code	m*
+code	m*
 	jsr	%2dup%
 	jsr	%xor%
 	jsr	%>r%
@@ -839,7 +852,7 @@ over c@ digit? while
 	jmp	%?dnegate%
 ;code
 
-:code	um*	; wastes W, W2, y
+code	um*	; wastes W, W2, y
 product = W
     lda #$00
     sta product+2 ; clear upper bits of product
@@ -875,13 +888,13 @@ rotate_r
     rts
 ;code
 
-:code	*
+code	*
 	jsr	%m*%
 	inx
 	rts
 ;code
 
-:code	fm/mod
+code	fm/mod
 	jsr	%dup%
 	jsr	%>r%
 	lda	MSB,x
@@ -906,7 +919,7 @@ rotate_r
 +	rts
 ;code
 
-:code	um/mod
+code	um/mod
         N = W
         SEC
         LDA     LSB+1,X     ; Subtract hi cell of dividend by
@@ -953,16 +966,16 @@ end:    INX
         jmp %swap%
 ;code
 
-:code	tuck
+code	tuck
 	jsr	%swap%
 	jmp	%over%
 ;code
 
-:code	char+
+code	char+
 	jmp	%1+%
 ;code
 
-:code	2@
+code	2@
 	jsr	%dup%
 	jsr	%2+%
 	jsr	%@%
@@ -970,7 +983,7 @@ end:    INX
 	jmp	%@%
 ;code
 
-:code	2!
+code	2!
 	jsr	%swap%
 	jsr	%over%
 	jsr	%!%
@@ -978,11 +991,11 @@ end:    INX
 	jmp	%!%
 ;code
 
-:code	bye
+code	bye
 	jmp	BYE
 ;code
 
-:code	execute
+code	execute
 	lda	LSB, x
 	sta	W
 	lda	MSB, x
@@ -991,7 +1004,7 @@ end:    INX
 	jmp	(W)
 ;code
 
-:code	(+loop)
+code	(+loop)
 	; r> swap r> 2dup +
 	jsr	%r>%
 	jsr	%swap%
@@ -1034,7 +1047,7 @@ end:    INX
 	rts
 ;code
 
-:code	dodoes
+code	dodoes
     ; behavior pointer address => W
     pla
     sta W
@@ -1065,154 +1078,228 @@ end:    INX
     jmp (W2)
 ;code
 
-:code	move
-; routines adapted from cc65
-; original by Ullrich von Bassewitz, Christian Krueger, Greg King
-SRC = W
-DST = W2
-LEN = W3
-    jsr %>r%
-    jsr %2dup%
-    jsr %u<%
-    jsr %r>%
-    jsr %swap%
-    jsr %0branch%
-    !word CMOVE
-    jmp CMOVE_BACK
-CMOVE
-    txa
-    pha
-	jsr cmove_getparams
-	ldy #0
-	ldx	LEN + 1
-	beq	.l2
-.l1
-	lda	(SRC),y ; copy byte
-	sta	(DST),y
-	iny
-	lda	(SRC),y ; copy byte again, to make it faster
-	sta	(DST),y
-	iny
-	bne .l1
-	inc	SRC + 1
-	inc DST + 1
-	dex ; next 256-byte block
-	bne .l1
-.l2
-	ldx	LEN
-	beq cmove_done
-.l3
-	lda (SRC),y
-	sta	(DST),y
-	iny
-	dex
-	bne	.l3
-cmove_done
-	pla
-    clc
-	adc #3
-	tax
-	rts
-
-cmove_getparams:
-	lda	LSB, x
-	sta	LEN
-	lda	MSB, x
-	sta	LEN + 1
-	lda	LSB + 1, x
-	sta	DST
-	lda	MSB + 1, x
-	sta	DST + 1
-	lda	LSB + 2, x
-	sta	SRC
-	lda	MSB + 2, x
-	sta	SRC + 1
-	rts
-
-CMOVE_BACK
+\ from cc65 memmove.s
+\ 2003-08-20, Ullrich von Bassewitz
+\ 2009-09-13, Christian Krueger -- performance increase (about 20%), 2013-07-25 improved unrolling
+\ 2015-10-23, Greg King
+code	move
+; Check for the copy direction. If dest < src, we must copy upwards (start at
+; low addresses and increase pointers), otherwise we must copy downwards
+; (start at high addresses and decrease pointers).
+ptr1 = W
+ptr2 = W2
+ptr3 = W3
 	txa
 	pha
-	jsr cmove_getparams
-    ; copy downwards. adjusts pointers to the end of memory regions.
-    lda SRC + 1
-    clc
-    adc LEN + 1
-    sta SRC + 1
-    lda DST + 1
-    clc
-    adc LEN + 1
-    sta DST + 1
 
-    ldy LEN
-    bne .entry
-    beq .pagesizecopy
-.copybyte
-    lda (SRC),y
-    sta (DST),y
-.entry
-    dey
-    bne .copybyte
-    lda (SRC),y
-    sta (DST),y
-.pagesizecopy
-    ldx LEN + 1
-    beq cmove_done
-.initbase
-    dec SRC + 1
-    dec DST + 1
-    dey
-    lda (SRC),y
-    sta (DST),y
-    dey
-.copybytes
-    lda (SRC),y
-    sta (DST),y
-    dey
-    lda (SRC),y
-    sta (DST),y
-    dey
-    bne .copybytes
-    lda (SRC),y
-    sta (DST),y
-    dex
-    bne .initbase
-	jmp cmove_done
+	ldy	#0
+
+	; ptr3 = n
+	lda	MSB,x
+	sta	ptr3+1
+	lda	LSB,x
+	sta	ptr3
+
+	; ptr1 = src
+	lda	MSB+2,x
+	sta	ptr1+1
+	lda	LSB+2,x
+	sta	ptr1
+
+	; ptr2 = dst
+	lda	MSB+1,x
+	sta	ptr2+1
+	lda	LSB+1,x
+	sta	ptr2
+
+; Check for the copy direction. If dest < src, we must copy upwards (start at
+; low addresses and increase pointers), otherwise we must copy downwards
+; (start at high addresses and decrease pointers).
+
+        cmp     ptr1
+	lda	ptr2+1
+        sbc     ptr1+1
+        bcc     memcpy_upwards  ; Branch if dest < src (upwards copy)
+
+; Copy downwards. Adjust the pointers to the end of the memory regions.
+
+        lda     ptr1+1
+	clc
+        adc     ptr3+1
+        sta     ptr1+1
+
+        lda     ptr2+1
+	clc
+        adc     ptr3+1
+        sta     ptr2+1
+
+; handle fractions of a page size first
+
+        ldy     ptr3            ; count, low byte
+        bne     @entry          ; something to copy?
+        beq     PageSizeCopy    ; here like bra...
+
+@copyByte:
+        lda     (ptr1),y
+        sta     (ptr2),y
+@entry:
+        dey
+        bne     @copyByte
+        lda     (ptr1),y        ; copy remaining byte
+        sta     (ptr2),y
+
+PageSizeCopy:                   ; assert Y = 0
+        ldx     ptr3+1          ; number of pages
+        beq     done            ; none? -> done
+
+@initBase:
+        dec     ptr1+1          ; adjust base...
+        dec     ptr2+1
+        dey                     ; in entry case: 0 -> FF
+@copyBytes:
+        lda     (ptr1),y        ; important: unrolling three times gives a nice
+        sta     (ptr2),y        ; 255/3 = 85 loop which ends at 0
+        dey
+        lda     (ptr1),y        ; important: unrolling three times gives a nice
+        sta     (ptr2),y        ; 255/3 = 85 loop which ends at 0
+        dey
+        lda     (ptr1),y        ; important: unrolling three times gives a nice
+        sta     (ptr2),y        ; 255/3 = 85 loop which ends at 0
+        dey
+@copyEntry:                     ; in entry case: 0 -> FF
+        bne     @copyBytes
+        lda     (ptr1),y        ; Y = 0, copy last byte
+        sta     (ptr2),y
+        dex                     ; one page to copy less
+        bne     @initBase       ; still a page to copy?
+
+done
+	pla
+	tax
+	inx
+	inx
+	inx
+	rts
+
+memcpy_upwards:                 ; assert Y = 0
+        ldx     ptr3+1          ; Get high byte of n
+        beq     L2              ; Jump if zero
+
+L1:
+        lda     (ptr1),Y        ; copy a byte
+        sta     (ptr2),Y
+        iny
+        lda     (ptr1),Y        ; copy a byte
+        sta     (ptr2),Y
+        iny
+        bne     L1
+        inc     ptr1+1
+        inc     ptr2+1
+        dex                     ; Next 256 byte block
+        bne     L1              ; Repeat if any
+
+        ; the following section could be 10% faster if we were able to copy
+        ; back to front - unfortunately we are forced to copy strict from
+        ; low to high since this function is also used for
+        ; memmove and blocks could be overlapping!
+L2:                             ; assert Y = 0
+        ldx     ptr3            ; Get the low byte of n
+        beq     done            ; something to copy
+
+L3:     lda     (ptr1),Y        ; copy a byte
+        sta     (ptr2),Y
+        iny
+        dex
+        bne     L3
+	jmp	done
 ;code
 
-:code	fill
-    lda	LSB, x
-    tay
-    lda	LSB + 2, x
-    sta	.fdst
-    lda	MSB + 2, x
-    sta	.fdst + 1
-    lda	LSB + 1, x
-    eor	#$ff
-    sta	W
-    lda	MSB + 1, x
-    eor	#$ff
-    sta	W + 1
-    inx
-    inx
-    inx
--
-    inc	W
-    bne	+
-    inc	W + 1
-    bne	+
-    rts
-+
-.fdst = * + 1
-    sty	$ffff ; overwrite
+\ from cc65 memset.s
+\ Ullrich von Bassewitz, 29.05.1998
+\ Performance increase (about 20%) by
+\ Christian Krueger, 12.09.2009, slightly improved 12.01.2011
+code	fill
+ptr1 = W
+ptr2 = W2
+ptr3 = W3
 
-    ; advance
-    inc	.fdst
-    bne	-
-    inc	.fdst + 1
-    jmp	-
+	txa
+	pha
+
+	lda	MSB+1,x
+	sta	ptr3+1
+	lda	LSB+1,x
+        sta     ptr3            ; Save n
+
+	; ptr1 = c-addr
+	lda	MSB+2,x
+	sta	ptr1+1
+	lda	LSB+2,x
+	sta	ptr1
+
+	; x = char
+	lda	LSB,x
+        tax
+	ldy	#0
+
+        lsr     ptr3+1          ; divide number of
+        ror     ptr3            ; bytes by two to increase
+        bcc     evenCount       ; speed (ptr3 = ptr3/2)
+oddCount:
+                                ; y is still 0 here
+        txa                     ; restore fill value
+        sta     (ptr1),y        ; save value and increase
+        inc     ptr1            ; dest. pointer
+        bne     evenCount
+        inc     ptr1+1
+evenCount:
+        lda     ptr1            ; build second pointer section
+        clc
+        adc     ptr3            ; ptr2 = ptr1 + (length/2) <- ptr3
+        sta     ptr2
+        lda     ptr1+1
+        adc     ptr3+1
+        sta     ptr2+1
+
+        txa                     ; restore fill value
+        ldx     ptr3+1          ; Get high byte of n
+        beq     .L2              ; Jump if zero
+
+; Set 256/512 byte blocks
+                                ; y is still 0 here
+.L1:
+        sta     (ptr1),y        ; Set byte in lower section
+        sta     (ptr2),y        ; Set byte in upper section
+        iny
+        sta     (ptr1),y        ; Set byte in lower section
+        sta     (ptr2),y        ; Set byte in upper section
+        iny
+
+        bne     .L1
+        inc     ptr1+1
+        inc     ptr2+1
+        dex                     ; Next 256 byte block
+        bne     .L1              ; Repeat if any
+
+; Set the remaining bytes if any
+
+.L2:     ldy     ptr3            ; Get the low byte of n
+        beq     leave           ; something to set? No -> leave
+
+.L3:     dey
+        sta     (ptr1),y                ; set bytes in low
+        sta     (ptr2),y                ; and high section
+        bne     .L3              ; flags still up to date from dey!
+leave:
+	pla
+	tax
+	inx
+	inx
+	inx
+	rts
 ;code
 
-:code	key?
+code	key?
     lda $c6 ; number of characters in keyboard buffer
     beq +
     lda #$ff
@@ -1220,7 +1307,7 @@ CMOVE_BACK
     jmp %pushya%
 ;code
 
-:code	key
+code	key
 -   lda $c6
     beq -
     stx W
@@ -1255,17 +1342,17 @@ begin
 again ;
 
 \ Using this trampoline to avoid overriding the Python accept.
-:code	accept ; ( addr u -- u )
+code	accept ; ( addr u -- u )
 	jmp	%(accept)%
 ;code
 
-:code	>body
+code	>body
 	jsr	%litc%
 	!byte	5	; skips jsr dodoes and code pointer
 	jmp	%+%
 ;code
 
-:code	(?do)
+code	(?do)
 	lda	LSB,x
 	cmp	LSB+1,x
 	bne	.enter_loop
@@ -1312,7 +1399,7 @@ again ;
 	rts
 ;code
 
-:code	(of)
+code	(of)
 	lda	LSB,x
 	cmp	LSB+1,x
 	bne	.endof
@@ -1331,6 +1418,26 @@ again ;
 ;code
 
 \ This is obviously not a proper QUIT, but since we do not have QUIT on C64, this is at least something.
-:code	quit
+code	quit
 	jmp	%bye%
 ;code
+
+code	page
+	lda	#$93
+	jmp	PUTCHR
+;code
+
+: environment?
+2dup s" /COUNTED-STRING" s= if 2drop 255 true exit then
+2dup s" /HOLD" s= if 2drop 34 true exit then \ minimum size: (2 x n) + 2 characters, where n is number of bits in a cell
+2dup s" /PAD" s= if 2drop 84 true exit then \ minimum size
+2dup s" ADDRESS-UNIT-BITS" s= if 2drop 8 true exit then \ 8 bits in a byte
+2dup s" FLOORED" s= if 2drop true true exit then \ symmetric division considered harmful
+2dup s" MAX-CHAR" s= if 2drop 255 true exit then
+2dup s" MAX-D" s= if 2drop -1 $7fff true exit then
+2dup s" MAX-N" s= if 2drop $7fff true exit then
+2dup s" MAX-U" s= if 2drop -1 true exit then
+2dup s" MAX-UD" s= if 2drop -1 -1 true exit then
+2dup s" RETURN-STACK-CELLS" s= if 2drop $7a true exit then \ When entering start word, SP=$f4
+2dup s" STACK-CELLS" s= if 2drop $38 true exit then
+2drop false ;
