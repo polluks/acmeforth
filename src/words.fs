@@ -8,9 +8,11 @@ code 0
 1 constant 1
 
 : chars ;
+: char+ 1+ ;
 : align ;
 : aligned ;
 
+: negate invert 1+ ;
 : if postpone 0branch here 0 , ; immediate
 : begin here ; immediate
 
@@ -37,8 +39,8 @@ dup $a < if 7 - then $37 + hold ;
 : u> swap u< ;
 : 2+ 1+ 1+ ;
 : cell+ 2+ ;
-: 2@ dup cell+ @ swap @ ;
-: 2! swap over ! cell+ ! ;
+: 2@ dup 2+ @ swap @ ;
+: 2! swap over ! 2+ ! ;
 : cells 2* ;
 : s>d dup 0< ;
 : min 2dup < if drop else nip then ;
@@ -97,6 +99,14 @@ create pad 84 allot
    ELSE
       R> DROP 2DROP FALSE      \ LENGTHS MISMATCH
    THEN ;
+
+: m+ s>d d+ ;
+: dnegate invert >r invert r> 1 m+ ;
+
+: fm/mod \ from Gforth
+dup >r dup 0< if negate >r dnegate r> then
+over 0< if tuck + swap then um/mod
+r> 0< if swap negate swap then ;
 
 ( from FIG UK )
 : /mod >r s>d r> fm/mod ;
@@ -313,11 +323,6 @@ code !
 	inx
 	inx
 	rts
-;code
-
-code negate
-	jsr %invert%
-	jmp %1+%
 ;code
 
 code 0<
@@ -589,37 +594,6 @@ code	?dnegate
 	beq	+
 	jsr	%dnegate%
 +	rts
-;code
-
-code	dnegate
-	jsr	%invert%
-	jsr	%>r%
-	jsr	%invert%
-	jsr	%r>%
-	jsr	%1%
-	jmp	%m+%
-;code
-
-code	m+
-	ldy #0
-	lda MSB,x
-	bpl +
-	dey
-+	clc
-	lda LSB,x
-	adc LSB+2,x
-	sta LSB+2,x
-	lda MSB,x
-	adc MSB+2,x
-	sta MSB+2,x
-	tya
-	adc LSB+1,x
-	sta LSB+1,x
-	tya
-	adc MSB+1,x
-	sta MSB+1,x
-	inx
-	rts
 ;code
 
 code	+!
@@ -894,31 +868,6 @@ code	*
 	rts
 ;code
 
-code	fm/mod
-	jsr	%dup%
-	jsr	%>r%
-	lda	MSB,x
-	bpl	+
-	jsr	%negate%
-	jsr	%>r%
-	jsr	%dnegate%
-	jsr	%r>%
-+	lda	MSB+1,x
-	bpl	+
-	jsr	%tuck%
-	jsr	%+%
-	jsr	%swap%
-+	jsr	%um/mod%
-	jsr	%r>%
-	inx
-	lda	MSB-1,x
-	bpl	+
-	jsr	%swap%
-	jsr	%negate%
-	jsr	%swap%
-+	rts
-;code
-
 code	um/mod
         N = W
         SEC
@@ -969,26 +918,6 @@ end:    INX
 code	tuck
 	jsr	%swap%
 	jmp	%over%
-;code
-
-code	char+
-	jmp	%1+%
-;code
-
-code	2@
-	jsr	%dup%
-	jsr	%2+%
-	jsr	%@%
-	jsr	%swap%
-	jmp	%@%
-;code
-
-code	2!
-	jsr	%swap%
-	jsr	%over%
-	jsr	%!%
-	jsr	%2+%
-	jmp	%!%
 ;code
 
 code	bye
@@ -1136,15 +1065,15 @@ ptr3 = W3
 ; handle fractions of a page size first
 
         ldy     ptr3            ; count, low byte
-        bne     @entry          ; something to copy?
+        bne     .entry          ; something to copy?
         beq     PageSizeCopy    ; here like bra...
 
-@copyByte:
+.copyByte:
         lda     (ptr1),y
         sta     (ptr2),y
-@entry:
+.entry:
         dey
-        bne     @copyByte
+        bne     .copyByte
         lda     (ptr1),y        ; copy remaining byte
         sta     (ptr2),y
 
@@ -1152,11 +1081,11 @@ PageSizeCopy:                   ; assert Y = 0
         ldx     ptr3+1          ; number of pages
         beq     done            ; none? -> done
 
-@initBase:
+.initBase:
         dec     ptr1+1          ; adjust base...
         dec     ptr2+1
         dey                     ; in entry case: 0 -> FF
-@copyBytes:
+.copyBytes:
         lda     (ptr1),y        ; important: unrolling three times gives a nice
         sta     (ptr2),y        ; 255/3 = 85 loop which ends at 0
         dey
@@ -1166,12 +1095,12 @@ PageSizeCopy:                   ; assert Y = 0
         lda     (ptr1),y        ; important: unrolling three times gives a nice
         sta     (ptr2),y        ; 255/3 = 85 loop which ends at 0
         dey
-@copyEntry:                     ; in entry case: 0 -> FF
-        bne     @copyBytes
+.copyEntry:                     ; in entry case: 0 -> FF
+        bne     .copyBytes
         lda     (ptr1),y        ; Y = 0, copy last byte
         sta     (ptr2),y
         dex                     ; one page to copy less
-        bne     @initBase       ; still a page to copy?
+        bne     .initBase       ; still a page to copy?
 
 done
 	pla

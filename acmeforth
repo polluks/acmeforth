@@ -124,7 +124,7 @@ def add_word(name, xt, immediate = False):
 
 def get_base():
 	if "base" in dictionary.words:
-		dictionary.words["base"].xt()
+		execute("base")
 		base_addr = stack.pop()
 		base = heap[base_addr]
 	if not base:
@@ -187,8 +187,11 @@ def evaluate_number(word):
 		number = -number
 	stack.append(ctypes.c_short(number).value)
 
+def execute(word_name):
+	dictionary.words[word_name].xt()
+
 def ABORT():
-	dictionary.words["abort"].xt()
+	execute("abort")
 
 def evaluate(word):
 	global stack
@@ -302,7 +305,7 @@ def compile(word):
 	if word.lower() in dictionary.words:
 		word = word.lower()
 		if dictionary.words[word].immediate:
-			dictionary.words[word].xt()
+			execute(word)
 		else:
 			append(dictionary.words[word].xt)
 	else:
@@ -342,7 +345,7 @@ def C_STORE():
 	dst = stack[-1]
 	v = stack[-2]
 	heap[dst] = v & 0xff
-	dictionary.words["2drop"].xt()
+	execute("2drop")
 
 def STORE():
 	dst = stack[-1]
@@ -461,10 +464,6 @@ def THEN():
 def ZERO_LT():
 	stack[-1] = -1 if stack[-1] < 0 else 0
 
-def NEGATE():
-	INVERT()
-	ONEPLUS()
-
 def QUIT():
 	global tib_addr
 	return_stack.clear()
@@ -499,7 +498,7 @@ def _QUESTION_DO():
 	EQUALS()
 	if stack.pop():
 		# Don't enter loop.
-		dictionary.words["2drop"].xt()
+		execute("2drop")
 		BRANCH()
 	else:
 		# Enter loop.
@@ -694,7 +693,7 @@ def TYPE():
 	for c in heap[stack[-2] : stack[-2] + stack[-1]]:
 		stack.append(c)
 		EMIT()
-	dictionary.words["2drop"].xt()
+	execute("2drop")
 
 def EXIT():
 	global ip
@@ -834,60 +833,6 @@ def UM_MOD(): # ( lsw msw divisor -- rem quot )
 	stack[-3] = ctypes.c_ushort(n % stack[-1]).value
 	stack[-2] = ctypes.c_short(n // d).value
 	stack.pop()
-
-def M_PLUS(): # ( d1 u -- d2 )
-	lsw = stack[-3]
-	msw = stack[-2]
-	n = (msw << 16) | ctypes.c_ushort(lsw).value
-	n += stack[-1]
-	stack[-3] = ctypes.c_short(n).value
-	stack[-2] = ctypes.c_short(n >> 16).value
-	stack.pop()
-
-# from FIG UK
-def D_NEGATE():
-	INVERT()
-	TO_R()
-	INVERT()
-	R_TO()
-	stack.append(1)
-	M_PLUS()
-
-# from Gforth
-def FM_MOD(): # ( d n -- rem quot )
-	# dup >r
-	DUP()
-	TO_R()
-	# dup 0< if negate >r dnegate r> then
-	DUP()
-	ZERO_LT()
-	if stack.pop():
-		NEGATE()
-		TO_R()
-		D_NEGATE()
-		R_TO()
-	# over 0< if tuck + swap then
-	OVER()
-	ZERO_LT()
-	if stack.pop():
-		TUCK()
-		PLUS()
-		SWAP()
-	# um/mod
-	UM_MOD()
-	# r> 0< if swap negate swap then
-	R_TO()
-	ZERO_LT()
-	if stack.pop():
-		SWAP()
-		NEGATE()
-		SWAP()
-
-# from FIG UK : ?dnegate 0< if dnegate then ;
-def Q_D_NEGATE():
-	ZERO_LT()
-	if stack.pop():
-		D_NEGATE()
 
 def POSTPONE():
 	name = read_word().lower()
@@ -1095,7 +1040,7 @@ def HASH_S(): # ( ud1 -- ud2 )
 
 def RT_HASH(): # ( xd -- c-addr u )
 	global format_addr
-	dictionary.words["2drop"].xt()
+	execute("2drop")
 	stack.append(pictured_numeric_addr)
 	stack.append(format_addr - here)
 	dst = pictured_numeric_addr
@@ -1133,14 +1078,14 @@ def FILL(): # ( c-addr u char -- )
 		heap[stack[-3]] = stack[-1]
 		stack[-2] -= 1
 		stack[-3] += 1
-	dictionary.words["2drop"].xt()
+	execute("2drop")
 	DROP()
 
 def MOVE(): # ( src dst u -- )
 	tmp = heap[stack[-3] : stack[-3] + stack[-1]]
 	for i in range(len(tmp)):
 		heap[stack[-2] + i] = tmp[i]
-	dictionary.words["2drop"].xt()
+	execute("2drop")
 	DROP()
 
 def DOT_QUOTE():
@@ -1325,7 +1270,6 @@ add_word("drop", DROP)
 add_word("0<", ZERO_LT)
 add_word("0branch", ZBRANCH)
 add_word("branch", BRANCH)
-add_word("negate", NEGATE)
 add_word("else", ELSE, True)
 add_word("then", THEN, True)
 add_word("cr", CR)
@@ -1376,7 +1320,6 @@ add_word("u<", U_LESS)
 add_word("*", MULTIPLY)
 add_word("m*", M_MULTIPLY)
 add_word("um*", UM_MULTIPLY)
-add_word("fm/mod", FM_MOD)
 add_word("um/mod", UM_MOD)
 add_word("tuck", TUCK)
 add_word("literal", LITERAL, True)
@@ -1384,7 +1327,6 @@ add_word("postpone", POSTPONE, True)
 add_word("here", HERE)
 add_word(",", COMMA)
 add_word("c,", C_COMMA)
-add_word("char+", lambda : ONEPLUS())	# Using lambda to separate xt's for the cross compiler.
 add_word("c@", C_FETCH)
 add_word("c!", C_STORE)
 add_word("while", WHILE, True)
